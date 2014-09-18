@@ -2,6 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import httplib
+import json
 import os
 import socket
 import sys
@@ -35,7 +37,7 @@ class SeleniumTestExecutor(TestExecutor):
     def __init__(self, browser, http_server_url, timeout_multiplier=1, **kwargs):
         do_delayed_imports()
         TestExecutor.__init__(self, browser, http_server_url, timeout_multiplier)
-        self.webdriver_port = browser.webdriver_port
+        self.webdriver_url = browser.webdriver_url
         self.webdriver = None
 
         self.timer = None
@@ -45,25 +47,21 @@ class SeleniumTestExecutor(TestExecutor):
     def setup(self, runner):
         """Connect to browser via Selenium's WebDriver implementation."""
         self.runner = runner
-        url = "http://localhost:%i/wd/url" % self.webdriver_port
-        self.logger.debug("Connecting to Selenium on URL: %s" % url)
+        self.logger.debug("Connecting to Selenium server: %s" % self.webdriver_url)
 
         session_started = False
         try:
-            time.sleep(1)
             self.webdriver = webdriver.Remote(
-                url, desired_capabilities=self.capabilities)
-            time.sleep(10)
+                self.webdriver_url, desired_capabilities=self.capabilities)
         except:
             self.logger.warning(
                 "Connecting to Selenium failed:\n%s" % traceback.format_exc())
-            time.sleep(1)
         else:
-            self.logger.debug("Selenium session started")
+            self.logger.debug("Selenium session started: %s" % self.webdriver.session_id)
             session_started = True
 
         if not session_started:
-            self.logger.warning("Failed to connect to Selenium")
+            self.logger.warning("Failed to connect to Selenium server")
             self.runner.send_message("init_failed")
         else:
             try:
@@ -84,6 +82,7 @@ class SeleniumTestExecutor(TestExecutor):
         del self.webdriver
 
     def is_alive(self):
+        return True
         try:
             # Get a simple property over the connection
             self.webdriver.current_window_handle
@@ -93,6 +92,22 @@ class SeleniumTestExecutor(TestExecutor):
         return True
 
     def after_connect(self):
+        self.logger.debug("Communicating Selenium session ID to httpd")
+
+        webdriver_endpoint = urlparse.urljoin(self.webdriver_url, "/session")  # <---- needs to be generalized!
+        proxy_endpoint = urlparse.urlparse(urlparse.urljoin(self.http_server_url, "/session"))
+
+        caps = self.webdriver.capabilities
+        caps.update({"-w3c-proxy-endpoint": webdriver_endpoint})
+        payload = {"sessionId": self.webdriver.session_id,
+            "capabilities": self.webdriver.capabilities}
+
+        conn = httplib.HTTPConnection(proxy_endpoint.netloc)
+        headers = {"Content-Type": "application/json"}
+        conn.request("POST", proxy_endpoint.path, json.dumps(payload), headers)
+        resp = conn.getresponse()
+        assert resp.status == 200
+
         url = urlparse.urljoin(self.http_server_url, "/testharness_runner.html")
         self.logger.debug("Loading %s" % url)
         self.webdriver.get(url)
@@ -125,12 +140,12 @@ class SeleniumTestExecutor(TestExecutor):
         self.timer = threading.Timer(timeout + 10, timeout_func)
         self.timer.start()
 
-        try:
-            self.webdriver.set_script_timeout((timeout + 5) * 1000)
-        except exceptions.ErrorInResponseException:
-            self.logger.error("Lost webdriver connection")
-            self.runner.send_message("restart_test", test)
-            return Stop
+        #try:
+        #    self.webdriver.set_script_timeout((timeout + 5) * 1000)
+        #except exceptions.ErrorInResponseException:
+        #    self.logger.error("Lost webdriver connection")
+        #    self.runner.send_message("restart_test", test)
+        #    return Stop
 
         try:
             result = self.convert_result(test, self.do_test(test, timeout))
@@ -180,9 +195,37 @@ class SeleniumTestharnessExecutor(SeleniumTestExecutor):
         self.script = open(os.path.join(here, "testharness_webdriver.js")).read()
 
     def do_test(self, test, timeout):
-        return self.webdriver.execute_async_script(
+        import time
+        from selenium.webdriver.support import wait
+
+        # execute_async_script
+        print "CURRENT WINDOW TITLE: %s" % self.webdriver.title
+        print "CURRENT WINDOW URL: %s" % self.webdriver.current_url
+        print "CURRENT WINDOW HANDLE: %s" % self.webdriver.current_window_handle
+        print "INJECTING SCRIPT"
+        self.webdriver.execute_script(
             self.script % {"abs_url": urlparse.urljoin(self.http_server_url, test.url),
                            "url": test.url,
                            "window_id": self.window_id,
+                           "session_id": self.webdriver.session_id,
                            "timeout_multiplier": self.timeout_multiplier,
                            "timeout": timeout * 1000})
+        print "SWITCHING TO TEST WINDOW"
+        def test_window_is_active(driver):
+            return True
+            try:
+            	self.logger.info("switching to: %s" % self.window_id)
+                driver.switch_to_window(self.window_id)
+                return True  # not needed?
+            except exceptions.NoSuchWindowException:
+                return False
+        successful_switch = wait.WebDriverWait(self.webdriver, 3).until(test_window_is_active)
+        print "SWITCHED! WAS IT SUCCESFUL? %s" % successful_switch
+        print "NEW WINDOW TITLE: %s" % self.webdriver.title
+
+        print "WAITING FOR TEST TO FINISH"  # this will trigger approx. 3s after window opens
+        import time; time.sleep(25)
+        print "ASKING FOR RESULT"
+        result = self.webdriver.execute_script("return window.opener.result")
+        print "RECEIVED result: %s" % result
+        return result

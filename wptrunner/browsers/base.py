@@ -85,10 +85,10 @@ class Browser(object):
         """Stop the running browser process."""
         pass
 
-    @abstractmethod
-    def on_output(self, line):
-        """Callback function used with ProcessHandler to handle output from the browser process."""
-        pass
+#    @abstractmethod
+#    def on_output(self, line):
+#        """Callback function used with ProcessHandler to handle output from the browser process."""
+#        pass
 
     @abstractmethod
     def is_alive(self):

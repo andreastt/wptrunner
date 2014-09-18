@@ -61,7 +61,8 @@ class ChromeBrowser(Browser):
     def start(self):
         self.cmd = [self.binary,
                     cmd_arg("port", str(self.webdriver_port)),
-                    cmd_arg("url-base", "wd/url")]
+                    cmd_arg("log-path", "/Users/ato/chromedriver.log")]
+                    #cmd_arg("verbose")]
         self.proc = mozprocess.ProcessHandler(self.cmd, processOutputLine=self.on_output)
         self.logger.debug("Starting chromedriver")
         self.proc.run()
@@ -87,3 +88,4 @@ class ChromeBrowser(Browser):
 
     def executor_browser(self):
         return ExecutorBrowser, {"webdriver_port": self.webdriver_port}
+

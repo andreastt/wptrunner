@@ -109,14 +109,14 @@ class TestEnvironment(object):
         serve.set_computed_defaults(config)
 
         serve.logger = serve.default_logger("info")
-        self.config, self.servers = serve.start(config)
+        #self.config, self.servers = serve.start(config)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.restore_files()
-        for scheme, servers in self.servers.iteritems():
-            for port, server in servers:
-                server.kill()
+        #for scheme, servers in self.servers.iteritems():
+        #    for port, server in servers:
+        #        server.kill()
 
     def load_config(self):
         default_config_path = os.path.join(self.test_path, "config.default.json")
@@ -149,6 +149,7 @@ class TestEnvironment(object):
     def ensure_started(self):
         # Pause for a while to ensure that the server has a chance to start
         time.sleep(2)
+        return
         for scheme, servers in self.servers.iteritems():
             for port, server in servers:
                 if self.test_server_port:
@@ -576,8 +577,9 @@ def run_tests(config, tests_root, metadata_root, product, **kwargs):
                 logger.critical("Error starting test environment: %s" % e.message)
                 raise
 
-            base_server = "http://%s:%i" % (test_environment.config["host"],
-                                            test_environment.config["ports"]["http"][0])
+            #base_server = "http://%s:%i" % (test_environment.config["host"],
+            #                                test_environment.config["ports"]["http"][0])
+            base_server = "http://localhost:8000"
             repeat = kwargs["repeat"]
             for repeat_count in xrange(repeat):
                 if repeat > 1:
