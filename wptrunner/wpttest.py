@@ -22,6 +22,9 @@ class Result(object):
         self.expected = expected
         self.extra = extra
 
+    def __repr__(self):
+        return "<%s.%s %s>" % (self.__module__, self.__class__.__name__, self.status)
+
 
 class SubtestResult(object):
     def __init__(self, name, status, message, stack=None, expected=None):
@@ -33,6 +36,8 @@ class SubtestResult(object):
         self.stack = stack
         self.expected = expected
 
+    def __repr__(self):
+        return "<%s.%s %s %s>" % (self.__module__, self.__class__.__name__, self.name, self.status)
 
 class TestharnessResult(Result):
     default_expected = "OK"
@@ -81,6 +86,7 @@ class RunInfo(dict):
             path = os.path.split(path)[0]
 
         mozinfo.find_and_update_from_json(*dirs)
+
 
 class B2GRunInfo(RunInfo):
     def __init__(self, *args, **kwargs):
@@ -190,6 +196,9 @@ class Test(object):
             return metadata.get("expected")
         except KeyError:
             return default
+
+    def __repr__(self):
+        return "<%s.%s %s>" % (self.__module__, self.__class__.__name__, self.id)
 
 
 class TestharnessTest(Test):
