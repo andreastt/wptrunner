@@ -12,6 +12,8 @@ import mozinfo
 from wptmanifest.parser import atoms
 
 atom_reset = atoms["Reset"]
+enabled_tests = set(["testharness", "reftest", "wdspec"])
+
 
 class Result(object):
     def __init__(self, status, message, expected=None, extra=None):
