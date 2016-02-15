@@ -63,6 +63,7 @@ class TestharnessResultConverter(object):
                 [test.subtest_result_cls(name, self.test_codes[status], message, stack)
                  for name, status, message, stack in subtest_results])
 
+
 testharness_result_converter = TestharnessResultConverter()
 
 
@@ -71,10 +72,23 @@ def reftest_result_converter(self, test, result):
                             extra=result.get("extra")), [])
 
 
+def nosetest_result_converter(self, test, data):
+    harness_data, subtest_data = data
+
+    if subtest_data is None:
+        subtest_data = []
+
+    harness_result = test.result_cls(*harness_data)
+    subtest_results = [test.subtest_result_cls(*item) for item in subtest_data]
+
+    return (harness_result, subtest_results)
+
+
 class ExecutorException(Exception):
     def __init__(self, status, message):
         self.status = status
         self.message = message
+
 
 class TestExecutor(object):
     __metaclass__ = ABCMeta
@@ -287,6 +301,11 @@ class RefTestImplementation(object):
         hash_val, _ = self.screenshot_cache[key]
         self.screenshot_cache[key] = hash_val, data
         return True, data
+
+
+class WdspecExecutor(TestExecutor):
+    convert_result = nosetest_result_converter
+
 
 class Protocol(object):
     def __init__(self, executor, browser):
