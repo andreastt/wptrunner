@@ -377,10 +377,11 @@ class Cookies(object):
 
 
 class Session(object):
-    def __init__(self, host, port, url_prefix="", desired_capabilities=None, port_timeout=60,
-                 extension=None):
-        self.transport = Transport(host, port, url_prefix, port_timeout)
-        self.desired_capabilities = desired_capabilities
+    def __init__(self, url, desired_capabilities=None,
+                 required_capabilities=None, wait=60, extension=None):
+        self.transport = Transport(url, wait=wait)
+        self.desired_capabilities = desired_capabilities or {}
+        self.required_capabilities = required_capabilities or {}
         self.session_id = None
         self.timeouts = None
         self.window = None
@@ -390,11 +391,14 @@ class Session(object):
         self.extension_cls = extension
 
     def start(self):
-        desired_capabilities = self.desired_capabilities if self.desired_capabilities else {}
-        body = {"capabilities": {"desiredCapabilites": desired_capabilities}}
+        body = {}
+        if self.desired_capabilities is not None:
+            body.update({"capabilities": {"desiredCapabilities": self.desired_capabilities}})
+        if self.required_capabilities is not None:
+            body.update({"capabilities": {"requiredCapabilities": self.required_capabilities}})
 
-        rv = self.transport.send("POST", "session", body=body)
-        self.session_id = rv["sessionId"]
+        resp = self.transport.send("POST", "session", body=body)
+        self.session_id = resp["sessionId"]
 
         self.timeouts = Timeouts(self)
         self.window = Window(self)
@@ -402,7 +406,7 @@ class Session(object):
         if self.extension_cls:
             self.extension = self.extension_cls(self)
 
-        return rv["value"]
+        return resp["value"]
 
     @command
     def end(self):
