@@ -39,9 +39,15 @@ class SubtestResult(object):
     def __repr__(self):
         return "<%s.%s %s %s>" % (self.__module__, self.__class__.__name__, self.name, self.status)
 
+
 class TestharnessResult(Result):
     default_expected = "OK"
     statuses = set(["OK", "ERROR", "TIMEOUT", "EXTERNAL-TIMEOUT", "CRASH"])
+
+
+class TestharnessSubtestResult(SubtestResult):
+    default_expected = "PASS"
+    statuses = set(["PASS", "FAIL", "TIMEOUT", "NOTRUN"])
 
 
 class ReftestResult(Result):
@@ -49,9 +55,14 @@ class ReftestResult(Result):
     statuses = set(["PASS", "FAIL", "ERROR", "TIMEOUT", "EXTERNAL-TIMEOUT", "CRASH"])
 
 
-class TestharnessSubtestResult(SubtestResult):
+class WdspecResult(Result):
+    default_expected = "OK"
+    statuses = set(["OK", "ERROR", "TIMEOUT", "EXTERNAL-TIMEOUT", "CRASH"])
+
+
+class WdspecSubtestResult(SubtestResult):
     default_expected = "PASS"
-    statuses = set(["PASS", "FAIL", "TIMEOUT", "NOTRUN"])
+    statuses = set(["PASS", "FAIL", "ERROR", "SKIP"])
 
 
 def get_run_info(metadata_root, product, **kwargs):
@@ -302,12 +313,18 @@ class ReftestTest(Test):
         return ("reftype", "refurl")
 
 
+class WdspecTest(Test):
+    result_cls = WdspecResult
+    subtest_result_cls = WdspecSubtestResult
+    test_type = "wdspec"
+
+
 manifest_test_cls = {"reftest": ReftestTest,
                      "testharness": TestharnessTest,
-                     "manual": ManualTest}
+                     "manual": ManualTest,
+                     "wdspec": WdspecTest}
 
 
 def from_manifest(manifest_test, inherit_metadata, test_metadata):
     test_cls = manifest_test_cls[manifest_test.item_type]
-
     return test_cls.from_manifest(manifest_test, inherit_metadata, test_metadata)
