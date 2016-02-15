@@ -1,10 +1,16 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 import errno
 import httplib
 import json
 import socket
 import time
 import urlparse
+
 from collections import defaultdict
+
 
 element_key = "element-6066-11e4-a52e-4f735466cecf"
 
@@ -12,9 +18,6 @@ element_key = "element-6066-11e4-a52e-4f735466cecf"
 class WebDriverException(Exception):
     http_status = None
     status_code = None
-
-    def __init__(self, message):
-        self.message = message
 
 
 class ElementNotSelectableException(WebDriverException):
