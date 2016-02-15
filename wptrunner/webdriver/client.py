@@ -232,14 +232,9 @@ class Transport(object):
             headers = {}
 
         url = self.path_prefix + url
-
         self._connection.request(method, url, body, headers)
 
-        try:
-            resp = self._connection.getresponse()
-        except Exception:
-            # This should probably be more specific
-            raise IOError
+        resp = self._connection.getresponse()
         resp_body = resp.read()
 
         try:
@@ -253,7 +248,6 @@ class Transport(object):
 
         if key is not None:
             data = data[key]
-
         if not data:
             data = None
 
