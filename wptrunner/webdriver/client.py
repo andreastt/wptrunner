@@ -206,6 +206,16 @@ class Transport(object):
         return urlparse.urljoin(self.url_prefix, suffix)
 
     def send(self, method, url, body=None, headers=None, key=None):
+        """Send a command to the remote.
+
+        :param method: "POST" or "GET".
+        :param body: Body of the request.  Defaults to an empty dictionary
+            if ``method`` is "POST".
+        :param headers: Additional headers to include in the request.
+        :param key: Extract this key from the dictionary returned from
+            the remote.
+        """
+
         if not self._connection:
             self.dial()
 
