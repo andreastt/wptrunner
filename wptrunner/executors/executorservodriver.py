@@ -14,7 +14,7 @@ from .base import (Protocol,
                    RefTestImplementation,
                    TestharnessExecutor,
                    strip_server)
-import webdriver
+from .. import webdriver
 from ..testrunner import Stop
 
 here = os.path.join(os.path.split(__file__)[0])
@@ -34,10 +34,10 @@ class ServoWebDriverProtocol(Protocol):
         """Connect to browser via WebDriver."""
         self.runner = runner
 
+        url = "http://%s:%d" % (self.host, self.port)
         session_started = False
         try:
-            self.session = webdriver.Session(self.host, self.port,
-                                             extension=webdriver.ServoExtensions)
+            self.session = webdriver.Session(url, extension=webdriver.ServoExtensions)
             self.session.start()
         except:
             self.logger.warning(
