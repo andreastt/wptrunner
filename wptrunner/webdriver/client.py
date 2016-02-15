@@ -303,6 +303,17 @@ class Window(object):
 
     @property
     @command
+    def handle(self):
+        return self.session.send_command("GET", "window_handle", key="value")
+
+    @handle.setter
+    @command
+    def handle(self, handle):
+        body = {"handle": handle}
+        return self.session.send_command("POST", "window", body=body)
+
+    @property
+    @command
     def size(self):
         return self.session.send_command("GET", "window/size")
 
@@ -445,17 +456,6 @@ class Session(object):
     @command
     def title(self):
         return self.send_command("GET", "title", key="value")
-
-    @property
-    @command
-    def handle(self):
-        return self.send_command("GET", "window_handle", key="value")
-
-    @handle.setter
-    @command
-    def handle(self, handle):
-        body = {"handle": handle}
-        return self.send_command("POST", "window", body=body)
 
     def switch_frame(self, frame):
         if frame == "parent":

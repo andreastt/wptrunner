@@ -159,7 +159,6 @@ class Test(object):
                 if subtest_meta is not None:
                     yield subtest_meta
 
-
     def disabled(self, subtest=None):
         for meta in self.itermeta(subtest):
             disabled = meta.disabled
