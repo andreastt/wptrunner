@@ -240,7 +240,7 @@ class Transport(object):
         try:
             data = json.loads(resp_body)
         except:
-            raise WebDriverException("Could not parse response body as JSON: %s" % body)
+            raise IOError("Could not parse response body as JSON: %s" % body)
 
         if resp.status != 200:
             cls = _exceptions.get(resp.status, {}).get(data.get("status", None), WebDriverException)
