@@ -130,11 +130,13 @@ class TestExecutor(object):
 
         :param runner: TestRunner instance that is going to run the tests"""
         self.runner = runner
-        self.protocol.setup(runner)
+        if self.protocol is not None:
+            self.protocol.setup(runner)
 
     def teardown(self):
         """Run cleanup steps after tests have finished"""
-        self.protocol.teardown()
+        if self.protocol is not None:
+            self.protocol.teardown()
 
     def run_test(self, test):
         """Run a particular test.
@@ -151,13 +153,13 @@ class TestExecutor(object):
         if result is Stop:
             return result
 
+        # did the parent test fail?
         if result[0].status == "ERROR":
             self.logger.debug(result[0].message)
 
         self.last_environment = test.environment
 
         self.runner.send_message("test_ended", test, result)
-
 
     def server_url(self, protocol):
         return "%s://%s:%s" % (protocol,
@@ -204,6 +206,7 @@ class RefTestExecutor(TestExecutor):
                               debug_info=debug_info)
 
         self.screenshot_cache = screenshot_cache
+
 
 class RefTestImplementation(object):
     def __init__(self, executor):
