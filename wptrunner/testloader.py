@@ -537,7 +537,7 @@ class TestLoader(object):
 
         for test_type in test_types:
             for test in self.tests[test_type]:
-                group = test.url.split("/")[1]
+                group = test.path.split("/")[1]
                 groups.add(group)
 
         return groups
