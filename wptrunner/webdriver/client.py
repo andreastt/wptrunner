@@ -243,8 +243,8 @@ class Transport(object):
             raise IOError("Could not parse response body as JSON: %s" % body)
 
         if resp.status != 200:
-            cls = _exceptions.get(resp.status, {}).get(data.get("status", None), WebDriverException)
-            raise cls(data.get("message", ""))
+            cls = _exceptions.get(resp.status, {}).get(data.get("error", None), WebDriverException)
+            raise cls(data.get("message"))
 
         if key is not None:
             data = data[key]
