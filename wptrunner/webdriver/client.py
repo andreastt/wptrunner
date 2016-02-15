@@ -155,7 +155,7 @@ del _objs
 del group_exceptions
 
 
-def wait_for_port(host, port, timeout=60):
+def wait_for_port(addr, timeout=60):
     """ Wait for the specified Marionette host/port to be available."""
     starttime = time.time()
     poll_interval = 0.1
@@ -163,7 +163,7 @@ def wait_for_port(host, port, timeout=60):
         sock = None
         try:
             sock = socket.socket()
-            sock.connect((host, port))
+            sock.connect(addr)
             return True
         except socket.error as e:
             if e[0] != errno.ECONNREFUSED:
@@ -176,21 +176,28 @@ def wait_for_port(host, port, timeout=60):
 
 
 class Transport(object):
-    def __init__(self, host, port, url_prefix="", port_timeout=60):
-        self.host = host
-        self.port = port
-        self.port_timeout = port_timeout
-        if url_prefix == "":
-            self.path_prefix = "/"
-        else:
-            self.path_prefix = "/%s/" % url_prefix.strip("/")
+    """Transports messages (commands and responses) over the WebDriver
+    wire protocol.
+    """
+
+    def __init__(self, url, wait=1):
+        """Construct interface for communicating with the remote server.
+
+        :param url: URL endpoint of remote WebDriver server.
+        :param wait: Duration to wait for remote to appear.
+        """
+
+        surl = urlparse.urlparse(url)
+        self.addr = (surl.hostname, surl.port)
+        self.path_prefix = surl.path.rstrip("/") + "/"
+        self._wait = wait
         self._connection = None
 
-    def connect(self):
-        wait_for_port(self.host, self.port, self.port_timeout)
-        self._connection = httplib.HTTPConnection(self.host, self.port)
+    def dial(self):
+        wait_for_port(self.addr, self._wait)
+        self._connection = httplib.HTTPConnection(*self.addr)
 
-    def close_connection(self):
+    def hangup(self):
         if self._connection:
             self._connection.close()
         self._connection = None
@@ -200,7 +207,7 @@ class Transport(object):
 
     def send(self, method, url, body=None, headers=None, key=None):
         if not self._connection:
-            self.connect()
+            self.dial()
 
         if body is None and method == "POST":
             body = {}
@@ -417,7 +424,7 @@ class Session(object):
         self.window = None
         self.find = None
         self.extension = None
-        self.transport.close_connection()
+        self.transport.hangup()
 
     def __enter__(self):
         resp = self.start()
@@ -628,6 +635,7 @@ class Element(object):
     @command
     def attribute(self, name):
         return self.session.send_command("GET", self.url("attribute/%s" % name))
+
 
 class ServoExtensions(object):
     def __init__(self, session):
