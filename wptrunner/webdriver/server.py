@@ -15,8 +15,9 @@ import urlparse
 import mozprocess
 
 
+__all__ = ["SeleniumServer", "ChromeDriverServer",
+           "GeckoDriverServer", "WebDriverServer"]
 
-__all__ = ["SeleniumLocalServer", "ChromedriverLocalServer"]
 
 class WebDriverServer(object):
     __metaclass__ = abc.ABCMeta
@@ -131,6 +132,19 @@ class ChromeDriverServer(WebDriverServer):
         return [self.binary,
                cmd_arg("port", str(self.port)),
                cmd_arg("url-base", self.endpoint) if self.endpoint else ""]
+
+
+class GeckoDriverServer(WebDriverServer):
+    def __init__(self, logger, marionette_port=2828, binary="wires", host="127.0.0.1", port=None):
+        WebDriverServer.__init__(self, logger, binary, host=host, port=port)
+        self.marionette_port = marionette_port
+
+    def make_command(self):
+        return [self.binary,
+               "--connect-existing",
+               "--marionette-port", str(self.marionette_port),
+               "--webdriver-host", self.host,
+               "--webdriver-port", str(self.port)]
 
 
 def cmd_arg(name, value=None):
