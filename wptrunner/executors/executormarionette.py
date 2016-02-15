@@ -5,7 +5,6 @@
 import hashlib
 import os
 import socket
-import sys
 import threading
 import time
 import traceback
@@ -13,10 +12,14 @@ import urlparse
 import uuid
 from collections import defaultdict
 
+from ..wpttest import WdspecResult, WdspecSubtestResult
+
 marionette = None
+nose = None
 
 here = os.path.join(os.path.split(__file__)[0])
 
+from .. import webdriver
 from .base import (ExecutorException,
                    Protocol,
                    RefTestExecutor,
@@ -25,21 +28,29 @@ from .base import (ExecutorException,
                    TestharnessExecutor,
                    testharness_result_converter,
                    reftest_result_converter,
-                   strip_server)
+                   strip_server,
+                   WdspecExecutor)
 from ..testrunner import Stop
 
 # Extra timeout to use after internal test timeout at which the harness
 # should force a timeout
 extra_timeout = 5 # seconds
 
+
 def do_delayed_imports():
     global marionette
     global errors
+    global nose
+
+    # Marionette client used to be called marionette, recently it changed
+    # to marionette_driver for unfathomable reasons
     try:
         import marionette
         from marionette import errors
     except ImportError:
         from marionette_driver import marionette, errors
+
+    import nose
 
 
 class MarionetteProtocol(Protocol):
@@ -54,7 +65,7 @@ class MarionetteProtocol(Protocol):
         """Connect to browser via Marionette."""
         Protocol.setup(self, runner)
 
-        self.logger.debug("Connecting to marionette on port %i" % self.marionette_port)
+        self.logger.debug("Connecting to Marionette on port %i" % self.marionette_port)
         self.marionette = marionette.Marionette(host='localhost', port=self.marionette_port)
 
         # XXX Move this timeout somewhere
@@ -97,12 +108,12 @@ class MarionetteProtocol(Protocol):
             pass
         del self.marionette
 
+    @property
     def is_alive(self):
-        """Check if the marionette connection is still active"""
+        """Check if the Marionette connection is still active."""
         try:
-            # Get a simple property over the connection
             self.marionette.current_window_handle
-        except Exception:
+        except:
             return False
         return True
 
@@ -213,7 +224,56 @@ class MarionetteProtocol(Protocol):
         with self.marionette.using_context(self.marionette.CONTEXT_CHROME):
             self.marionette.execute_script(script)
 
-class MarionetteRun(object):
+
+class RemoteMarionetteProtocol(Protocol):
+    def __init__(self, executor, browser):
+        do_delayed_imports()
+        Protocol.__init__(self, executor, browser)
+        self.session = None
+        self.webdriver_binary = executor.webdriver_binary
+        self.marionette_port = browser.marionette_port
+
+    def setup(self, runner):
+        """Connect to browser via the Marionette HTTP server."""
+        try:
+            self.server = webdriver.GeckoDriverServer(
+                self.logger, self.marionette_port, binary=self.webdriver_binary)
+            self.server.start(block=False)
+            self.logger.info("WebDriver HTTP server listening at %s" % self.server.url)
+
+            self.logger.info("Establishing new WebDriver session with %s" % self.server.url)
+            self.session = webdriver.Session(self.server.url)
+            self.session.start()
+        except:
+            self.logger.error(traceback.format_exc())
+            self.executor.runner.send_message("init_failed")
+        else:
+            self.executor.runner.send_message("init_succeeded")
+
+    def teardown(self):
+        try:
+            self.session.end()
+        except:
+            pass
+        if self.server.is_alive:
+            self.server.stop()
+
+    @property
+    def is_alive(self):
+        """Test that the Marionette connection is still alive.
+
+        Because the remote communication happens over HTTP we need to
+        make an explicit request to the remote.
+        """
+
+        try:
+            self.session.window.handle
+        except IOError:
+            return False
+        return True
+
+
+class ExecuteAsyncRun(object):
     def __init__(self, logger, func, marionette, url, timeout):
         self.logger = logger
         self.result = None
@@ -277,8 +337,8 @@ class MarionetteRun(object):
 
 
 class MarionetteTestharnessExecutor(TestharnessExecutor):
-    def __init__(self, browser, server_config, timeout_multiplier=1, close_after_done=True,
-                 debug_info=None):
+    def __init__(self, browser, server_config, timeout_multiplier=1,
+                 close_after_done=True, debug_info=None, **kwargs):
         """Marionette-based executor for testharness.js tests"""
         TestharnessExecutor.__init__(self, browser, server_config,
                                      timeout_multiplier=timeout_multiplier,
@@ -295,7 +355,7 @@ class MarionetteTestharnessExecutor(TestharnessExecutor):
             do_delayed_imports()
 
     def is_alive(self):
-        return self.protocol.is_alive()
+        return self.protocol.is_alive
 
     def on_environment_change(self, new_environment):
         self.protocol.on_environment_change(self.last_environment, new_environment)
@@ -307,7 +367,7 @@ class MarionetteTestharnessExecutor(TestharnessExecutor):
         timeout = (test.timeout * self.timeout_multiplier if self.debug_info is None
                    else None)
 
-        success, data = MarionetteRun(self.logger,
+        success, data = ExecuteAsyncRun(self.logger,
                                       self.do_testharness,
                                       self.protocol.marionette,
                                       self.test_url(test),
@@ -338,7 +398,9 @@ class MarionetteTestharnessExecutor(TestharnessExecutor):
 
 class MarionetteRefTestExecutor(RefTestExecutor):
     def __init__(self, browser, server_config, timeout_multiplier=1,
-                 screenshot_cache=None, close_after_done=True, debug_info=None):
+                 screenshot_cache=None, close_after_done=True,
+                 debug_info=None, **kwargs):
+
         """Marionette-based executor for reftests"""
         RefTestExecutor.__init__(self,
                                  browser,
@@ -358,7 +420,7 @@ class MarionetteRefTestExecutor(RefTestExecutor):
             self.wait_script = f.read()
 
     def is_alive(self):
-        return self.protocol.is_alive()
+        return self.protocol.is_alive
 
     def on_environment_change(self, new_environment):
         self.protocol.on_environment_change(self.last_environment, new_environment)
@@ -376,7 +438,6 @@ class MarionetteRefTestExecutor(RefTestExecutor):
             self.has_window = True
 
         result = self.implementation.run_test(test)
-
         return self.convert_result(test, result)
 
     def screenshot(self, test, viewport_size, dpi):
@@ -388,7 +449,7 @@ class MarionetteRefTestExecutor(RefTestExecutor):
 
         test_url = self.test_url(test)
 
-        return MarionetteRun(self.logger,
+        return ExecuteAsyncRun(self.logger,
                              self._screenshot,
                              self.protocol.marionette,
                              test_url,
@@ -405,3 +466,168 @@ class MarionetteRefTestExecutor(RefTestExecutor):
             screenshot = screenshot.split(",", 1)[1]
 
         return screenshot
+
+
+class WdspecRun(object):
+    def __init__(self, func, session, path, timeout):
+        self.func = func
+        self.result = None
+        self.session = session
+        self.path = path
+        self.timeout = timeout
+        self.result_flag = threading.Event()
+
+    def run(self):
+        """Runs function in a thread and interrupts it if it exceeds the
+        given timeout.  Returns (True, (Result, [SubtestResult ...])) in
+        case of success, or (False, (status, extra information)) in the
+        event of failure.
+        """
+
+        executor = threading.Thread(target=self._run)
+        executor.start()
+
+        flag = self.result_flag.wait(self.timeout)
+        if self.result is None:
+            assert not flag
+            self.result = False, ("EXTERNAL-TIMEOUT", None)
+
+        return self.result
+
+    def _run(self):
+        try:
+            self.result = True, self.func(self.session, self.path, self.timeout)
+        except webdriver.TimeoutException:
+            self.result = False, ("EXTERNAL-TIMEOUT", None)
+        except (socket.timeout, IOError):
+            self.result = False, ("CRASH", None)
+        except Exception as e:
+            message = getattr(e, "message")
+            if message:
+                message += "\n"
+            message += traceback.format_exc(e)
+            self.result = False, ("ERROR", message)
+        finally:
+            self.result_flag.set()
+
+
+class MarionetteWdspecExecutor(WdspecExecutor):
+    def __init__(self, browser, server_config, webdriver_binary,
+                 timeout_multiplier=1, close_after_done=True, debug_info=None):
+        WdspecExecutor.__init__(self, browser, server_config,
+                                timeout_multiplier=timeout_multiplier,
+                                debug_info=debug_info)
+        self.webdriver_binary = webdriver_binary
+        self.protocol = RemoteMarionetteProtocol(self, browser)
+
+        if nose is None:
+            do_delayed_imports()
+
+    def is_alive(self):
+        return self.protocol.is_alive
+
+    def on_environment_change(self, new_environment):
+        pass
+
+    def do_test(self, test):
+        timeout = test.timeout * self.timeout_multiplier + extra_timeout
+
+        success, data = WdspecRun(self.do_wdspec,
+                                  self.protocol.session,
+                                  test.path,
+                                  timeout).run()
+
+        if success:
+            return self.convert_result(test, data)
+
+        return (test.result_cls(*data), [])
+
+    def do_wdspec(self, session, path, timeout):
+        class StreamRedirecter(nose.plugins.Plugin):
+            """Redirects the output stream of nosetests to the given
+            stream, or if no stream is given, to `/dev/null`.
+            """
+
+            name = "stream-redirecter"
+            enabled = True
+
+            def __init__(self, redirect=None):
+                nose.plugins.Plugin.__init__(self)
+                self.fh = redirect or open(os.devnull, "w")
+
+            def setOutputStream(self, stream):
+                return self
+
+            def write(self, s):
+                self.fh.write(s)
+
+            def writeln(self, line=""):
+                self.fh.write("%s\n" % line)
+
+            def flush(self):
+                self.fh.flush()
+
+        class SubtestResultRecorder(nose.plugins.Plugin):
+            """Maps test results to accepted ``wpttest`` test results."""
+
+            name = "subtest-result-recorder"
+            enabled = True
+
+            def __init__(self):
+                nose.plugins.Plugin.__init__(self)
+                self.results = []
+
+            def addSuccess(self, test):
+                self.record_result(test, "PASS")
+
+            def addFailure(self, test, failure):
+                _, message, exc = failure
+                stack = traceback.format_exc(exc)
+                self.record_result(test, "FAIL", message, stack=stack)
+
+            def addError(self, test, error):
+                _, message, exc = error
+                stack = traceback.format_exc(exc)
+                self.record_result(test, "ERROR", message, stack=stack)
+
+            def addSkip(self, test):
+                self.record_result(test, "SKIP")
+
+            def record_result(self, test, status, message=None, stack=None):
+                new_result = (test.id(), status, message, stack)
+                self.results.append(new_result)
+
+        class SessionAdapter(nose.plugins.Plugin):
+            """Exposes a `session` global in the scope of context
+            functions in the test.
+            """
+
+            name = "session-adapter"
+            enabled = True
+
+            def __init__(self, session):
+                nose.plugins.Plugin.__init__(self)
+                self.session = session
+
+            def startContext(self, context):
+                context.session = self.session
+
+        silence = StreamRedirecter()
+        recorder = SubtestResultRecorder()
+        adapter = SessionAdapter(session)
+
+        print "path=%s" % path
+
+        nose.core.TestProgram(
+            exit=False,
+            defaultTest=path,
+            addplugins=[silence, adapter, recorder],
+            argv=["nosetests",
+                  "--nocapture",
+                  "--with-stream-redirecter",
+                  "--with-subtest-result-recorder",
+                  "--with-session-adapter"])
+
+        harness_result = ("OK", None)
+        subtest_results = recorder.results
+        return (harness_result, subtest_results)
