@@ -2,120 +2,168 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import abc
 import errno
+import os
+import platform
 import socket
+import threading
 import time
 import traceback
 import urlparse
 
 import mozprocess
 
-from .base import get_free_port, cmd_arg
 
 
 __all__ = ["SeleniumLocalServer", "ChromedriverLocalServer"]
 
+class WebDriverServer(object):
+    __metaclass__ = abc.ABCMeta
 
-class LocalServer(object):
-    used_ports = set()
     default_endpoint = "/"
+    _used_ports = set()
 
-    def __init__(self, logger, binary, port=None, endpoint=None):
+    def __init__(self, logger, binary, host="127.0.0.1", port=None, endpoint=None):
         self.logger = logger
         self.binary = binary
-        self.port = port
+        self.host = host
         self.endpoint = endpoint or self.default_endpoint
 
-        if self.port is None:
-            self.port = get_free_port(4444, exclude=self.used_ports)
-        self.used_ports.add(self.port)
-        self.url = "http://127.0.0.1:%i%s" % (self.port, self.endpoint)
+        self._port = port
+        self._cmd = None
+        self._proc = None
 
-        self.proc, self.cmd = None, None
+    @abc.abstractmethod
+    def make_command(self):
+        """Returns the full command for starting the server process as a list."""
 
-    def start(self):
-        self.proc = mozprocess.ProcessHandler(
-            self.cmd, processOutputLine=self.on_output)
+    def start(self, block=True):
         try:
-            self.proc.run()
+            self._run(block)
+        except KeyboardInterrupt:
+            self.stop()
+
+    def _run(self, block):
+        env = os.environ.copy()
+        env["RUST_BACKTRACE"] = "1"
+
+        self._cmd = self.make_command()
+        self._proc = mozprocess.ProcessHandler(
+            self._cmd,
+            processOutputLine=self.on_output,
+            env=env,
+            storeOutput=False)
+
+        try:
+            self._proc.run()
         except OSError as e:
             if e.errno == errno.ENOENT:
                 raise IOError(
-                    "chromedriver executable not found: %s" % self.binary)
+                    "WebDriver HTTP server executable not found: %s" % self.binary)
             raise
 
         self.logger.debug(
             "Waiting for server to become accessible: %s" % self.url)
-        surl = urlparse.urlparse(self.url)
-        addr = (surl.hostname, surl.port)
         try:
-            wait_service(addr)
+            wait_for_service((self.host, self.port))
         except:
             self.logger.error(
-                "Server was not accessible within the timeout:\n%s" % traceback.format_exc())
+                "WebDriver HTTP server was not accessible "
+                "within the timeout:\n%s" % traceback.format_exc())
             raise
-        else:
-            self.logger.info("Server listening on port %i" % self.port)
+
+        if block:
+            self._proc.wait()
 
     def stop(self):
-        if hasattr(self.proc, "proc"):
-            self.proc.kill()
+        if self.is_alive:
+            return self._proc.kill()
+        return not self.is_alive
 
+    @property
     def is_alive(self):
-        if hasattr(self.proc, "proc"):
-            exitcode = self.proc.poll()
-            return exitcode is None
-        return False
+        return (self._proc is not None and
+            self._proc.proc is not None and
+            self._proc.poll() is None)
 
     def on_output(self, line):
         self.logger.process_output(self.pid,
                                    line.decode("utf8", "replace"),
-                                   command=" ".join(self.cmd))
+                                   command=" ".join(self._cmd))
 
     @property
     def pid(self):
-        if hasattr(self.proc, "proc"):
-            return self.proc.pid
+        if self._proc is not None:
+            return self._proc.pid
+
+    @property
+    def url(self):
+        return "http://%s:%i%s" % (self.host, self.port, self.endpoint)
+
+    @property
+    def port(self):
+        if self._port is None:
+            self._port = self._find_next_free_port()
+        return self._port
+
+    @staticmethod
+    def _find_next_free_port():
+        port = get_free_port(4444, exclude=WebDriverServer._used_ports)
+        WebDriverServer._used_ports.add(port)
+        return port
 
 
-class SeleniumLocalServer(LocalServer):
+class SeleniumServer(WebDriverServer):
     default_endpoint = "/wd/hub"
 
-    def __init__(self, logger, binary, port=None):
-        LocalServer.__init__(self, logger, binary, port=port)
-        self.cmd = ["java",
-                    "-jar", self.binary,
-                    "-port", str(self.port)]
-
-    def start(self):
-        self.logger.debug("Starting local Selenium server")
-        LocalServer.start(self)
-
-    def stop(self):
-        LocalServer.stop(self)
-        self.logger.info("Selenium server stopped listening")
+    def make_command(self):
+        return ["java", "-jar", self.binary, "-port", str(self.port)]
 
 
-class ChromedriverLocalServer(LocalServer):
+class ChromeDriverServer(WebDriverServer):
     default_endpoint = "/wd/hub"
 
     def __init__(self, logger, binary="chromedriver", port=None, endpoint=None):
-        LocalServer.__init__(self, logger, binary, port=port, endpoint=endpoint)
-        # TODO: verbose logging
-        self.cmd = [self.binary,
-                    cmd_arg("port", str(self.port)) if self.port else "",
-                    cmd_arg("url-base", self.endpoint) if self.endpoint else ""]
+        WebDriverServer.__init__(self, logger, binary, port=port, endpoint=endpoint)
 
-    def start(self):
-        self.logger.debug("Starting local chromedriver server")
-        LocalServer.start(self)
-
-    def stop(self):
-        LocalServer.stop(self)
-        self.logger.info("chromedriver server stopped listening")
+    def make_command(self):
+        return [self.binary,
+               cmd_arg("port", str(self.port)),
+               cmd_arg("url-base", self.endpoint) if self.endpoint else ""]
 
 
-def wait_service(addr, timeout=15):
+def cmd_arg(name, value=None):
+    prefix = "-" if platform.system() == "Windows" else "--"
+    rv = prefix + name
+    if value is not None:
+        rv += "=" + value
+    return rv
+
+
+def get_free_port(start_port, exclude=None):
+    """Get the first port number after start_port (inclusive) that is
+    not currently bound.
+
+    :param start_port: Integer port number at which to start testing.
+    :param exclude: Set of port numbers to skip"""
+    port = start_port
+    while True:
+        if exclude and port in exclude:
+            port += 1
+            continue
+        s = socket.socket()
+        try:
+            s.bind(("127.0.0.1", port))
+        except socket.error:
+            port += 1
+        else:
+            return port
+        finally:
+            s.close()
+
+
+def wait_for_service(addr, timeout=15):
     """Waits until network service given as a tuple of (host, port) becomes
     available or the `timeout` duration is reached, at which point
     ``socket.error`` is raised."""
