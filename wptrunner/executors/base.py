@@ -153,7 +153,7 @@ class TestExecutor(object):
         if result is Stop:
             return result
 
-        # did the parent test fail?
+        # log result of parent test
         if result[0].status == "ERROR":
             self.logger.debug(result[0].message)
 
