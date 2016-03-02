@@ -67,7 +67,8 @@ def executor_kwargs(test_type, server_config, cache_manager, run_info_data,
                 executor_kwargs["timeout_multiplier"] = 2
         elif run_info_data["debug"]:
             executor_kwargs["timeout_multiplier"] = 3
-    executor_kwargs["webdriver_binary"] = kwargs.get("webdriver_binary")
+    if test_type == "wdspec":
+        executor_kwargs["webdriver_binary"] = kwargs.get("webdriver_binary")
     return executor_kwargs
 
 
