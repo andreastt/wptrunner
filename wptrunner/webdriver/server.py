@@ -25,11 +25,12 @@ class WebDriverServer(object):
     default_endpoint = "/"
     _used_ports = set()
 
-    def __init__(self, logger, binary, host="127.0.0.1", port=None, endpoint=None):
+    def __init__(self, logger, binary, host="127.0.0.1", port=None, endpoint=None, env=None):
         self.logger = logger
         self.binary = binary
         self.host = host
         self.endpoint = endpoint or self.default_endpoint
+        self.env = os.environ.copy() if env is None else env
 
         self._port = port
         self._cmd = None
@@ -46,9 +47,6 @@ class WebDriverServer(object):
             self.stop()
 
     def _run(self, block):
-        env = os.environ.copy()
-        env["RUST_BACKTRACE"] = "1"
-
         self._cmd = self.make_command()
         self._proc = mozprocess.ProcessHandler(
             self._cmd,
@@ -136,7 +134,9 @@ class ChromeDriverServer(WebDriverServer):
 
 class GeckoDriverServer(WebDriverServer):
     def __init__(self, logger, marionette_port=2828, binary="wires", host="127.0.0.1", port=None):
-        WebDriverServer.__init__(self, logger, binary, host=host, port=port)
+        env = os.environ.copy()
+        env["RUST_BACKTRACE"] = "1"      
+        WebDriverServer.__init__(self, logger, binary, host=host, port=port, env=env)
         self.marionette_port = marionette_port
 
     def make_command(self):
