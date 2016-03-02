@@ -616,8 +616,6 @@ class MarionetteWdspecExecutor(WdspecExecutor):
         recorder = SubtestResultRecorder()
         adapter = SessionAdapter(session)
 
-        print "path=%s" % path
-
         nose.core.TestProgram(
             exit=False,
             defaultTest=path,
