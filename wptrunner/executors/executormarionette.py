@@ -113,7 +113,7 @@ class MarionetteProtocol(Protocol):
         """Check if the Marionette connection is still active."""
         try:
             self.marionette.current_window_handle
-        except:
+        except Exception:
             return False
         return True
 
@@ -244,7 +244,7 @@ class RemoteMarionetteProtocol(Protocol):
             self.logger.info("Establishing new WebDriver session with %s" % self.server.url)
             self.session = webdriver.Session(self.server.url)
             self.session.start()
-        except:
+        except Exception:
             self.logger.error(traceback.format_exc())
             self.executor.runner.send_message("init_failed")
         else:
@@ -253,7 +253,7 @@ class RemoteMarionetteProtocol(Protocol):
     def teardown(self):
         try:
             self.session.end()
-        except:
+        except Exception:
             pass
         if self.server.is_alive:
             self.server.stop()
