@@ -112,11 +112,11 @@ class Test(object):
     subtest_result_cls = None
     test_type = None
 
-    def __init__(self, path, inherit_metadata, test_metadata, timeout=DEFAULT_TIMEOUT, url=None,
+    def __init__(self, url, inherit_metadata, test_metadata, timeout=DEFAULT_TIMEOUT, path=None,
                  protocol="http"):
         self.path = path
-        self.url = url
         self.timeout = timeout
+        self.url = url
         self._inherit_metadata = inherit_metadata
         self._test_metadata = test_metadata
         self.environment = {"protocol": protocol, "prefs": self.prefs}
@@ -136,7 +136,7 @@ class Test(object):
 
     @property
     def id(self):
-        return self.path
+        return self.url
 
     @property
     def keys(self):
