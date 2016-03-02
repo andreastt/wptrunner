@@ -380,8 +380,14 @@ class Session(object):
     def __init__(self, url, desired_capabilities=None,
                  required_capabilities=None, wait=60, extension=None):
         self.transport = Transport(url, wait=wait)
-        self.desired_capabilities = desired_capabilities or {}
-        self.required_capabilities = required_capabilities or {}
+        if desired_capabilities is None:
+            self.desired_capabilities = {}
+        else:
+            self.desired_capabilities = desired_capabilities
+        if required_capabilities is None:
+            self.required_capabilities = {}
+        else:
+            self.required_capabilities = required_capabilities
         self.session_id = None
         self.timeouts = None
         self.window = None
