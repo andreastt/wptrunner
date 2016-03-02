@@ -591,7 +591,9 @@ class MarionetteWdspecExecutor(WdspecExecutor):
                 self.record_result(test, "ERROR", message, stack=stack)
 
             def addSkip(self, test):
-                self.record_result(test, "SKIP")
+                self.record_result(test, "ERROR",
+                    "In-test skip decorators are disallowed, "
+                    "please use WPT metadata to ignore tests.")
 
             def record_result(self, test, status, message=None, stack=None):
                 new_result = (test.id(), status, message, stack)

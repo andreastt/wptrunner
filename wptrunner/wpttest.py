@@ -64,7 +64,7 @@ class WdspecResult(Result):
 
 class WdspecSubtestResult(SubtestResult):
     default_expected = "PASS"
-    statuses = set(["PASS", "FAIL", "ERROR", "SKIP"])
+    statuses = set(["PASS", "FAIL", "ERROR"])
 
 
 def get_run_info(metadata_root, product, **kwargs):
