@@ -497,8 +497,6 @@ class WdspecRun(object):
     def _run(self):
         try:
             self.result = True, self.func(self.session, self.path, self.timeout)
-        except webdriver.TimeoutException:
-            self.result = False, ("EXTERNAL-TIMEOUT", None)
         except (socket.timeout, IOError):
             self.result = False, ("CRASH", None)
         except Exception as e:
