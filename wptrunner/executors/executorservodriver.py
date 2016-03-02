@@ -63,7 +63,7 @@ class ServoWebDriverProtocol(Protocol):
     def is_alive(self):
         try:
             # Get a simple property over the connection
-            self.session.handle
+            self.session.window_handle
         # TODO what exception?
         except Exception:
             return False
