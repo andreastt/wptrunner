@@ -195,11 +195,11 @@ class Transport(object):
         self._wait = wait
         self._connection = None
 
-    def dial(self):
+    def connect(self):
         wait_for_port(self.host, self.port, self._wait)
         self._connection = httplib.HTTPConnection(self.host, self.port)
 
-    def hangup(self):
+    def close_connection(self):
         if self._connection:
             self._connection.close()
         self._connection = None
@@ -219,7 +219,7 @@ class Transport(object):
         """
 
         if not self._connection:
-            self.dial()
+            self.connect()
 
         if body is None and method == "POST":
             body = {}
@@ -419,7 +419,7 @@ class Session(object):
         self.window = None
         self.find = None
         self.extension = None
-        self.transport.hangup()
+        self.transport.close_connection()
 
     def __enter__(self):
         resp = self.start()
