@@ -239,10 +239,13 @@ class RemoteMarionetteProtocol(Protocol):
             self.server = webdriver.server.GeckoDriverServer(
                 self.logger, self.marionette_port, binary=self.webdriver_binary)
             self.server.start(block=False)
-            self.logger.info("WebDriver HTTP server listening at %s" % self.server.url)
+            self.logger.info(
+                "WebDriver HTTP server listening at %s" % self.server.url)
 
-            self.logger.info("Establishing new WebDriver session with %s" % self.server.url)
-            self.session = webdriver.client.Session(self.server.url)
+            self.logger.info(
+                "Establishing new WebDriver session with %s" % self.server.url)
+            self.session = webdriver.client.Session(
+                self.server.host, self.server.port, self.server.endpoint)
             self.session.start()
         except Exception:
             self.logger.error(traceback.format_exc())

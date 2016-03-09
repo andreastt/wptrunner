@@ -38,7 +38,7 @@ class ServoWebDriverProtocol(Protocol):
         session_started = False
         try:
             self.session = webdriver.client.Session(
-                url, extension=webdriver.client.ServoExtensions)
+                self.host, self.port, extension=webdriver.client.ServoExtensions)
             self.session.start()
         except:
             self.logger.warning(

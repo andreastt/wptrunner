@@ -155,15 +155,15 @@ del _objs
 del group_exceptions
 
 
-def wait_for_port(addr, timeout=60):
-    """ Wait for the specified Marionette host/port to be available."""
+def wait_for_port(host, port, timeout=60):
+    """Wait for the specified Marionette host/port to be available."""
     starttime = time.time()
     poll_interval = 0.1
     while time.time() - starttime < timeout:
         sock = None
         try:
             sock = socket.socket()
-            sock.connect(addr)
+            sock.connect((host, port))
             return True
         except socket.error as e:
             if e[0] != errno.ECONNREFUSED:
@@ -180,22 +180,24 @@ class Transport(object):
     wire protocol.
     """
 
-    def __init__(self, url, wait=1):
+    def __init__(self, host, port, url_prefix="", wait=1):
         """Construct interface for communicating with the remote server.
 
         :param url: URL endpoint of remote WebDriver server.
         :param wait: Duration to wait for remote to appear.
         """
 
-        surl = urlparse.urlparse(url)
-        self.addr = (surl.hostname, surl.port)
-        self.path_prefix = surl.path.rstrip("/") + "/"
+        self.host = host
+        self.port = port
+        if url_prefix == "":
+            self.path_prefix = "/"
+
         self._wait = wait
         self._connection = None
 
     def dial(self):
-        wait_for_port(self.addr, self._wait)
-        self._connection = httplib.HTTPConnection(*self.addr)
+        wait_for_port(self.host, self.port, self._wait)
+        self._connection = httplib.HTTPConnection(self.host, self.port)
 
     def hangup(self):
         if self._connection:
@@ -377,9 +379,9 @@ class Cookies(object):
 
 
 class Session(object):
-    def __init__(self, url, desired_capabilities=None,
+    def __init__(self, host, port, url_prefix="", desired_capabilities=None,
                  required_capabilities=None, wait=60, extension=None):
-        self.transport = Transport(url, wait=wait)
+        self.transport = Transport(host, port, url_prefix, wait=wait)
         self.desired_capabilities = desired_capabilities
         self.required_capabilities = required_capabilities
         self.session_id = None

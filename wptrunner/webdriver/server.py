@@ -25,14 +25,17 @@ class WebDriverServer(object):
     default_endpoint = "/"
     _used_ports = set()
 
-    def __init__(self, logger, binary, host="127.0.0.1", port=None, endpoint=None, env=None):
+    def __init__(self, logger, binary, host="127.0.0.1", port=None, endpoint="", env=None):
         self.logger = logger
         self.binary = binary
         self.host = host
-        self.endpoint = endpoint or self.default_endpoint
+        if endpoint == "":
+            self.endpoint = self.default_endpoint
+        else:
+            self.endpoint = endpoint
         self.env = os.environ.copy() if env is None else env
 
-        self._port = port
+        self.port = port
         self._cmd = None
         self._proc = None
 
