@@ -138,7 +138,7 @@ class ChromeDriverServer(WebDriverServer):
 class GeckoDriverServer(WebDriverServer):
     def __init__(self, logger, marionette_port=2828, binary="wires", host="127.0.0.1", port=None):
         env = os.environ.copy()
-        env["RUST_BACKTRACE"] = "1"      
+        env["RUST_BACKTRACE"] = "1"
         WebDriverServer.__init__(self, logger, binary, host=host, port=port, env=env)
         self.marionette_port = marionette_port
 
