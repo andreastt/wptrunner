@@ -13,14 +13,18 @@ from mozprofile.permissions import ServerLocations
 from mozrunner import FirefoxRunner
 from mozcrash import mozcrash
 
-from .base import get_free_port, Browser, ExecutorBrowser, require_arg, cmd_arg, browser_command
+from .base import (get_free_port,
+                   Browser,
+                   ExecutorBrowser,
+                   require_arg,
+                   cmd_arg,
+                   browser_command)
 from ..executors import executor_kwargs as base_executor_kwargs
-from ..executors.executormarionette import (
-    MarionetteTestharnessExecutor,
-    MarionetteRefTestExecutor,
-    MarionetteWdspecExecutor,
-)
+from ..executors.executormarionette import (MarionetteTestharnessExecutor,
+                                            MarionetteRefTestExecutor,
+                                            MarionetteWdspecExecutor)
 from ..environment import hostnames
+
 
 here = os.path.join(os.path.split(__file__)[0])
 
