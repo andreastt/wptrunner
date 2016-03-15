@@ -3,6 +3,7 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import hashlib
+import httplib
 import os
 import socket
 import threading
@@ -232,6 +233,7 @@ class RemoteMarionetteProtocol(Protocol):
         self.session = None
         self.webdriver_binary = executor.webdriver_binary
         self.marionette_port = browser.marionette_port
+        self.server = None
 
     def setup(self, runner):
         """Connect to browser via the Marionette HTTP server."""
@@ -246,7 +248,7 @@ class RemoteMarionetteProtocol(Protocol):
                 "Establishing new WebDriver session with %s" % self.server.url)
             self.session = webdriver.client.Session(
                 self.server.host, self.server.port, self.server.endpoint)
-            self.session.start()
+            #self.session.start()
         except Exception:
             self.logger.error(traceback.format_exc())
             self.executor.runner.send_message("init_failed")
@@ -255,10 +257,11 @@ class RemoteMarionetteProtocol(Protocol):
 
     def teardown(self):
         try:
-            self.session.end()
+            if self.session.session_id is not None:
+                self.session.end()
         except Exception:
             pass
-        if self.server.is_alive:
+        if self.server is not None and self.server.is_alive:
             self.server.stop()
 
     @property
@@ -266,14 +269,17 @@ class RemoteMarionetteProtocol(Protocol):
         """Test that the Marionette connection is still alive.
 
         Because the remote communication happens over HTTP we need to
-        make an explicit request to the remote.
-        """
+        make an explicit request to the remote.  It is allowed for
+        WebDriver spec tests to not have a WebDriver session, since this
+        may be part of what is tested.
 
-        try:
-            self.session.window.handle
-        except IOError:
-            return False
-        return True
+        An HTTP request to an invalid endpint that results in a 404 is
+        proof enough to us that the server is alive and kicking.
+        """
+        conn = httplib.HTTPConnection(self.server.host, self.server.port)
+        conn.request("HEAD", self.server.endpoint + "invalid")
+        res = conn.getresponse()
+        return res.status == 404
 
 
 class ExecuteAsyncRun(object):

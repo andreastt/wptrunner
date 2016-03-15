@@ -180,7 +180,7 @@ class Transport(object):
     wire protocol.
     """
 
-    def __init__(self, host, port, url_prefix="", wait=1):
+    def __init__(self, host, port, url_prefix="/", wait=1):
         """Construct interface for communicating with the remote server.
 
         :param url: URL endpoint of remote WebDriver server.
@@ -189,8 +189,7 @@ class Transport(object):
 
         self.host = host
         self.port = port
-        if url_prefix == "":
-            self.path_prefix = "/"
+        self.path_prefix = url_prefix
 
         self._wait = wait
         self._connection = None
@@ -205,7 +204,7 @@ class Transport(object):
         self._connection = None
 
     def url(self, suffix):
-        return urlparse.urljoin(self.url_prefix, suffix)
+        return urlparse.urljoin(self.path_prefix, suffix)
 
     def send(self, method, url, body=None, headers=None, key=None):
         """Send a command to the remote.
@@ -259,12 +258,14 @@ class Transport(object):
 def command(func):
     def inner(self, *args, **kwargs):
         if hasattr(self, "session"):
-            session_id = self.session.session_id
+            session = self.session
         else:
-            session_id = self.session_id
+            session = self
 
-        if session_id is None:
-            raise SessionNotCreatedException("Session not created")
+        if session.session_id is None:
+            session.start()
+        assert session.session_id != None
+
         return func(self, *args, **kwargs)
 
     inner.__name__ = func.__name__
@@ -466,13 +467,13 @@ class Session(object):
     @property
     @command
     def window_handle(self):
-        return self.session.send_command("GET", "window_handle", key="value")
+        return self.send_command("GET", "window_handle", key="value")
 
     @window_handle.setter
     @command
     def window_handle(self, handle):
         body = {"handle": handle}
-        return self.session.send_command("POST", "window", body=body)
+        return self.send_command("POST", "window", body=body)
 
     def switch_frame(self, frame):
         if frame == "parent":

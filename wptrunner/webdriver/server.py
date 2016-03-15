@@ -35,7 +35,7 @@ class WebDriverServer(object):
             self.endpoint = endpoint
         self.env = os.environ.copy() if env is None else env
 
-        self.port = port
+        self._port = port
         self._cmd = None
         self._proc = None
 
@@ -54,7 +54,7 @@ class WebDriverServer(object):
         self._proc = mozprocess.ProcessHandler(
             self._cmd,
             processOutputLine=self.on_output,
-            env=env,
+            env=self.env,
             storeOutput=False)
 
         try:

@@ -114,11 +114,11 @@ class Test(object):
 
     def __init__(self, url, inherit_metadata, test_metadata, timeout=DEFAULT_TIMEOUT, path=None,
                  protocol="http"):
-        self.path = path
-        self.timeout = timeout
         self.url = url
         self._inherit_metadata = inherit_metadata
         self._test_metadata = test_metadata
+        self.timeout = timeout
+        self.path = path
         self.environment = {"protocol": protocol, "prefs": self.prefs}
 
     def __eq__(self, other):
@@ -127,11 +127,11 @@ class Test(object):
     @classmethod
     def from_manifest(cls, manifest_item, inherit_metadata, test_metadata):
         timeout = LONG_TIMEOUT if manifest_item.timeout == "long" else DEFAULT_TIMEOUT
-        return cls(manifest_item.path,
+        return cls(manifest_item.url,
                    inherit_metadata,
                    test_metadata,
                    timeout=timeout,
-                   url=getattr(manifest_item, "url"),
+                   path=manifest_item.path,
                    protocol="https" if hasattr(manifest_item, "https") and manifest_item.https else "http")
 
     @property
