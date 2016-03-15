@@ -379,11 +379,10 @@ class Cookies(object):
 
 
 class Session(object):
-    def __init__(self, host, port, url_prefix="", desired_capabilities=None,
-                 required_capabilities=None, wait=60, extension=None):
+    def __init__(self, host, port, url_prefix="", capabilities=None,
+                 wait=60, extension=None):
         self.transport = Transport(host, port, url_prefix, wait=wait)
-        self.desired_capabilities = desired_capabilities
-        self.required_capabilities = required_capabilities
+        self.capabilities = capabilities
         self.session_id = None
         self.timeouts = None
         self.window = None
@@ -394,10 +393,8 @@ class Session(object):
 
     def start(self):
         body = {}
-        if self.desired_capabilities is not None:
-            body.update({"capabilities": {"desiredCapabilities": self.desired_capabilities}})
-        if self.required_capabilities is not None:
-            body.update({"capabilities": {"requiredCapabilities": self.required_capabilities}})
+        if self.capabilities is not None:
+            body["capabilities"] = self.capabilities
 
         resp = self.transport.send("POST", "session", body=body)
         self.session_id = resp["sessionId"]
