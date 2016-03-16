@@ -271,9 +271,9 @@ class RemoteMarionetteProtocol(Protocol):
         Because the remote communication happens over HTTP we need to
         make an explicit request to the remote.  It is allowed for
         WebDriver spec tests to not have a WebDriver session, since this
-        may be part of what is tested.
+        may be what is tested.
 
-        An HTTP request to an invalid endpint that results in a 404 is
+        An HTTP request to an invalid endpoint that results in a 404 is
         proof enough to us that the server is alive and kicking.
         """
         conn = httplib.HTTPConnection(self.server.host, self.server.port)
