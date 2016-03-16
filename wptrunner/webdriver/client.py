@@ -183,7 +183,7 @@ class Transport(object):
     def __init__(self, host, port, url_prefix="/", wait=1):
         """Construct interface for communicating with the remote server.
 
-        :param url: URL endpoint of remote WebDriver server.
+        :param url: URL of remote WebDriver server.
         :param wait: Duration to wait for remote to appear.
         """
 

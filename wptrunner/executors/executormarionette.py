@@ -247,7 +247,7 @@ class RemoteMarionetteProtocol(Protocol):
             self.logger.info(
                 "Establishing new WebDriver session with %s" % self.server.url)
             self.session = webdriver.client.Session(
-                self.server.host, self.server.port, self.server.endpoint)
+                self.server.host, self.server.port, self.server.base_path)
             #self.session.start()
         except Exception:
             self.logger.error(traceback.format_exc())
@@ -273,11 +273,11 @@ class RemoteMarionetteProtocol(Protocol):
         WebDriver spec tests to not have a WebDriver session, since this
         may be what is tested.
 
-        An HTTP request to an invalid endpoint that results in a 404 is
+        An HTTP request to an invalid path that results in a 404 is
         proof enough to us that the server is alive and kicking.
         """
         conn = httplib.HTTPConnection(self.server.host, self.server.port)
-        conn.request("HEAD", self.server.endpoint + "invalid")
+        conn.request("HEAD", self.server.base_path + "invalid")
         res = conn.getresponse()
         return res.status == 404
 
