@@ -22,17 +22,18 @@ __all__ = ["SeleniumServer", "ChromeDriverServer",
 class WebDriverServer(object):
     __metaclass__ = abc.ABCMeta
 
-    default_endpoint = "/"
+    default_base_path = "/"
     _used_ports = set()
 
-    def __init__(self, logger, binary, host="127.0.0.1", port=None, endpoint="", env=None):
+    def __init__(self, logger, binary, host="127.0.0.1", port=None,
+                 base_path="", env=None):
         self.logger = logger
         self.binary = binary
         self.host = host
-        if endpoint == "":
-            self.endpoint = self.default_endpoint
+        if base_path == "":
+            self.base_path = self.default_base_path
         else:
-            self.endpoint = endpoint
+            self.base_path = base_path
         self.env = os.environ.copy() if env is None else env
 
         self._port = port
@@ -101,7 +102,7 @@ class WebDriverServer(object):
 
     @property
     def url(self):
-        return "http://%s:%i%s" % (self.host, self.port, self.endpoint)
+        return "http://%s:%i%s" % (self.host, self.port, self.base_path)
 
     @property
     def port(self):
@@ -117,26 +118,29 @@ class WebDriverServer(object):
 
 
 class SeleniumServer(WebDriverServer):
-    default_endpoint = "/wd/hub"
+    default_base_path = "/wd/hub"
 
     def make_command(self):
         return ["java", "-jar", self.binary, "-port", str(self.port)]
 
 
 class ChromeDriverServer(WebDriverServer):
-    default_endpoint = "/wd/hub"
+    default_base_path = "/wd/hub"
 
-    def __init__(self, logger, binary="chromedriver", port=None, endpoint=None):
-        WebDriverServer.__init__(self, logger, binary, port=port, endpoint=endpoint)
+    def __init__(self, logger, binary="chromedriver", port=None,
+                 base_path=""):
+        WebDriverServer.__init__(
+            self, logger, binary, port=port, base_path=base_path)
 
     def make_command(self):
         return [self.binary,
                cmd_arg("port", str(self.port)),
-               cmd_arg("url-base", self.endpoint) if self.endpoint else ""]
+               cmd_arg("url-base", self.base_path) if self.base_path else ""]
 
 
 class GeckoDriverServer(WebDriverServer):
-    def __init__(self, logger, marionette_port=2828, binary="wires", host="127.0.0.1", port=None):
+    def __init__(self, logger, marionette_port=2828, binary="wires",
+                 host="127.0.0.1", port=None):
         env = os.environ.copy()
         env["RUST_BACKTRACE"] = "1"
         WebDriverServer.__init__(self, logger, binary, host=host, port=port, env=env)
