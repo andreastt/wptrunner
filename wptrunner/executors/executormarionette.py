@@ -282,7 +282,7 @@ class RemoteMarionetteProtocol(Protocol):
         return res.status == 404
 
 
-class ExecuteAsyncRun(object):
+class ExecuteAsyncScriptRun(object):
     def __init__(self, logger, func, marionette, url, timeout):
         self.logger = logger
         self.result = None
@@ -376,7 +376,7 @@ class MarionetteTestharnessExecutor(TestharnessExecutor):
         timeout = (test.timeout * self.timeout_multiplier if self.debug_info is None
                    else None)
 
-        success, data = ExecuteAsyncRun(self.logger,
+        success, data = ExecuteAsyncScriptRun(self.logger,
                                       self.do_testharness,
                                       self.protocol.marionette,
                                       self.test_url(test),
@@ -458,7 +458,7 @@ class MarionetteRefTestExecutor(RefTestExecutor):
 
         test_url = self.test_url(test)
 
-        return ExecuteAsyncRun(self.logger,
+        return ExecuteAsyncScriptRun(self.logger,
                              self._screenshot,
                              self.protocol.marionette,
                              test_url,
