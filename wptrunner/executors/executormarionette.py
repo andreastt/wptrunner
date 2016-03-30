@@ -16,10 +16,10 @@ from collections import defaultdict
 from ..wpttest import WdspecResult, WdspecSubtestResult
 
 marionette = None
-nose = None
 
 here = os.path.join(os.path.split(__file__)[0])
 
+from . import pytestrunner
 from .. import webdriver
 from .base import (ExecutorException,
                    Protocol,
@@ -39,9 +39,7 @@ extra_timeout = 5 # seconds
 
 
 def do_delayed_imports():
-    global marionette
-    global errors
-    global nose
+    global errors, marionette
 
     # Marionette client used to be called marionette, recently it changed
     # to marionette_driver for unfathomable reasons
@@ -50,8 +48,6 @@ def do_delayed_imports():
         from marionette import errors
     except ImportError:
         from marionette_driver import marionette, errors
-
-    import nose
 
 
 class MarionetteProtocol(Protocol):
@@ -248,7 +244,6 @@ class RemoteMarionetteProtocol(Protocol):
                 "Establishing new WebDriver session with %s" % self.server.url)
             self.session = webdriver.client.Session(
                 self.server.host, self.server.port, self.server.base_path)
-            #self.session.start()
         except Exception:
             self.logger.error(traceback.format_exc())
             self.executor.runner.send_message("init_failed")
@@ -527,9 +522,6 @@ class MarionetteWdspecExecutor(WdspecExecutor):
         self.webdriver_binary = webdriver_binary
         self.protocol = RemoteMarionetteProtocol(self, browser)
 
-        if nose is None:
-            do_delayed_imports()
-
     def is_alive(self):
         return self.protocol.is_alive
 
@@ -550,91 +542,6 @@ class MarionetteWdspecExecutor(WdspecExecutor):
         return (test.result_cls(*data), [])
 
     def do_wdspec(self, session, path, timeout):
-        class StreamRedirecter(nose.plugins.Plugin):
-            """Redirects the output stream of nosetests to the given
-            stream, or if no stream is given, to `/dev/null`.
-            """
-
-            name = "stream-redirecter"
-            enabled = True
-
-            def __init__(self, redirect=None):
-                nose.plugins.Plugin.__init__(self)
-                self.fh = redirect or open(os.devnull, "w")
-
-            def setOutputStream(self, stream):
-                return self
-
-            def write(self, s):
-                self.fh.write(s)
-
-            def writeln(self, line=""):
-                self.fh.write("%s\n" % line)
-
-            def flush(self):
-                self.fh.flush()
-
-        class SubtestResultRecorder(nose.plugins.Plugin):
-            """Maps test results to accepted ``wpttest`` test results."""
-
-            name = "subtest-result-recorder"
-            enabled = True
-
-            def __init__(self):
-                nose.plugins.Plugin.__init__(self)
-                self.results = []
-
-            def addSuccess(self, test):
-                self.record_result(test, "PASS")
-
-            def addFailure(self, test, failure):
-                _, message, exc = failure
-                stack = traceback.format_exc(exc)
-                self.record_result(test, "FAIL", message, stack=stack)
-
-            def addError(self, test, error):
-                _, message, exc = error
-                stack = traceback.format_exc(exc)
-                self.record_result(test, "ERROR", message, stack=stack)
-
-            def addSkip(self, test):
-                self.record_result(test, "ERROR",
-                    "In-test skip decorators are disallowed, "
-                    "please use WPT metadata to ignore tests.")
-
-            def record_result(self, test, status, message=None, stack=None):
-                new_result = (test.id(), status, message, stack)
-                self.results.append(new_result)
-
-        class SessionAdapter(nose.plugins.Plugin):
-            """Exposes a `session` global in the scope of context
-            functions in the test.
-            """
-
-            name = "session-adapter"
-            enabled = True
-
-            def __init__(self, session):
-                nose.plugins.Plugin.__init__(self)
-                self.session = session
-
-            def startContext(self, context):
-                context.session = self.session
-
-        silence = StreamRedirecter()
-        recorder = SubtestResultRecorder()
-        adapter = SessionAdapter(session)
-
-        nose.core.TestProgram(
-            exit=False,
-            defaultTest=path,
-            addplugins=[silence, adapter, recorder],
-            argv=["nosetests",
-                  "--nocapture",
-                  "--with-stream-redirecter",
-                  "--with-subtest-result-recorder",
-                  "--with-session-adapter"])
-
         harness_result = ("OK", None)
-        subtest_results = recorder.results
+        subtest_results = pytestrunner.run(path, session, timeout=timeout)
         return (harness_result, subtest_results)
