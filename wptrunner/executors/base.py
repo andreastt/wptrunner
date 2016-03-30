@@ -72,7 +72,7 @@ def reftest_result_converter(self, test, result):
                             extra=result.get("extra")), [])
 
 
-def nosetest_result_converter(self, test, data):
+def pytest_result_converter(self, test, data):
     harness_data, subtest_data = data
 
     if subtest_data is None:
@@ -307,7 +307,7 @@ class RefTestImplementation(object):
 
 
 class WdspecExecutor(TestExecutor):
-    convert_result = nosetest_result_converter
+    convert_result = pytest_result_converter
 
 
 class Protocol(object):
